@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 
-from .common import BaseConvBlock, BaseResidualBlock
+from .common_modules import BaseConvBlock, BaseResidualBlock
 
 
 class Generator(nn.Module):
@@ -46,12 +46,12 @@ class Discriminator(nn.Module):
         super().__init__()
 
         self.model = nn.Sequential(
-            BaseConvBlock(input_features, 64, 4, 2, 1, norm=False, act='nn.LeakyReLU', spectral_=True),
-            BaseConvBlock(64, 128, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_=True),
-            BaseConvBlock(128, 256, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_=True),
-            BaseConvBlock(256, 512, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_=True),
-            BaseConvBlock(512, 1024, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_=True),
-            BaseConvBlock(1024, 2048, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_=True),
+            BaseConvBlock(input_features, 64, 4, 2, 1, norm=False, act='nn.LeakyReLU', spectral_normalize=True),
+            BaseConvBlock(64, 128, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
+            BaseConvBlock(128, 256, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
+            BaseConvBlock(256, 512, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
+            BaseConvBlock(512, 1024, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
+            BaseConvBlock(1024, 2048, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
         )
 
         self.patch_discriminator_conv = spectral_norm(nn.Conv2d(2048, 1, kernel_size=3, padding=1))
