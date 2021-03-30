@@ -1,0 +1,12 @@
+data:
+
+model:
+  Generator:
+
+  Discriminator:
+wandb:
+  turn_on: True
+  project_name: StarGan_torch
+
+checkpoints:
+  save_path: ./checkpoints/
