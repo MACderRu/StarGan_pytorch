@@ -69,7 +69,6 @@ class Discriminator(nn.Module):
 
 class StarGAN(nn.Module):
     def __init__(self,
-                 input_features,
                  lbl_features,
                  image_size,
                  residual_block_number=6,
@@ -77,14 +76,14 @@ class StarGAN(nn.Module):
         super().__init__()
 
         self.G = Generator(
-            input_features=input_features + lbl_features,
+            input_features=3 + lbl_features,
             output_features=3,
             residual_num=residual_block_number,
             image_size=image_size
         )
 
         self.D = Discriminator(
-            input_features=input_features,
+            input_features=3,
             label_features=lbl_features,
             image_size=image_size
         )

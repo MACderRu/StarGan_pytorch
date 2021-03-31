@@ -1,3 +1,5 @@
+import sys
+import wandb
 import numpy as np
 
 import torch
@@ -6,7 +8,7 @@ import torch.nn.functional as F
 import torchvision
 from torchvision.datasets import CelebA
 
-from torch.autograd import grad
+from .config import Config
 
 
 def permute_labels(labels):
@@ -54,18 +56,11 @@ def load_celeba(path):
     return data
 
 
-def save_checkpoint(path: str, checkpoint: dict, epoch_num: int) -> None:
-    # checkpoint = {
-    #     'epoch': epoch_num,
-    #     'model_state_dict': model_gan.state_dict(),
-    #     'optimizer_g_state_dict': optimizers['G'].state_dict(),
-    #     'optimizer_d_state_dict': optimizers['D'].state_dict()
-    # }
-
+def save_checkpoint(path: str, checkpoint: dict) -> None:
     try:
         torch.save(checkpoint, path)
     except Exception as e:
-        print(f"Failed to save checkpoint, epoch: {epoch_num}")
+        print(f"Failed to save checkpoint...")
 
 
 def load_checkpoint(path):
@@ -73,5 +68,14 @@ def load_checkpoint(path):
     return checkpoint
 
 
-def train_model(model,):
+def terminate_launch(message, logging_state):
+    print(message)
+
+    if logging_state:
+        wandb.finish()
+
+    sys.exit(0)
+
+
+def get_latest_run(checkpoints_path_dir):
     pass

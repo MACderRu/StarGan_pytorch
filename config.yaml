@@ -1,12 +1,26 @@
 data:
-
-model:
-  Generator:
-
-  Discriminator:
+  celeba:
+    AttributeList:
+      - Young
+      - Male
+      - Smiling
+      - Black_Hair
+      - Blond_Hair
+      - Gray_Hair
+      - Brown_Hair
+training:
+  lambda_gp: 10
+  lambda_cls: 1
+  lambda_rec_original: 10
+  lambda_rec_fake: 1
+  learning_rate_discriminator: 1e-4
+  learning_rate_generator: 1e-4
+  adam_betas: [0.5, 0.999]
+  n_critic: 5
+  epochs_num: 20
+  batch_size: 16
 wandb:
-  turn_on: True
   project_name: StarGan_torch
-
+  log_step: 15
 checkpoints:
   save_path: ./checkpoints/

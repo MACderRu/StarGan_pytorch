@@ -1,3 +1,5 @@
+import wandb
+import typing as tp
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -5,7 +7,9 @@ from torch.autograd import grad
 from scipy import linalg
 from tqdm.auto import tqdm
 
-from src.common_utils.utils import permute_labels
+from ..common_utils.utils import permute_labels, save_checkpoint, load_checkpoint
+from ..common_utils.config import Config
+from ..star_gan.main_model import StarGAN
 
 
 def compute_gradient_penalty(discriminator, real_samples, fake_samples):
@@ -32,34 +36,14 @@ def compute_gradient_penalty(discriminator, real_samples, fake_samples):
     return ((norm - 1) ** 2).mean()
 
 
-# class DiscriminatorLoss:
-#     def __init__(self,
-#                  lambda_cls,
-#                  lambda_rec):
-#         self.cls_loss = F.binary_cross_entropy_with_logits
-#
-#     def _get_label_classification_loss(self, cls_out, cls_true):
-#         return self.cls_loss(cls_out, cls_true)
-#
-#     def _get_adversarial_loss(self, fake, real):
-#         return real.mean() - fake.mean()
-#
-#     def calc_loss(self, discriminator, real_im, fake_im):
-#         real_out, _ = discriminator(real_im)
-#         fake_out, _ = discriminator(fake_im)
-#         L_adv = self._get_adversarial_loss(fake_out, real_out)
-#
-#         cls_loss = self._get_label_classification_loss(classification_out, cls_true)
-#         return cls_loss
-
-
 def get_description(desc, epoch, d_cls, d_adv, d_gp, g_cls, g_adv, g_rec):
     return desc.format(epoch, g_cls, g_adv, g_rec, d_cls, d_adv, d_gp)
 
 
-def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transformer, log=False):
+def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transformer, log_step=None):
     model.train()
     iter_idx = 0
+
 
     optimizer_d = optimizers['D']
     optimizer_g = optimizers['G']
@@ -183,6 +167,7 @@ def fid_distance_from_activations(acts1, acts2):
 
     diff = mu1 - mu2
 
+    eps = 1e-8
     covmean, _ = linalg.sqrtm(sigma1.dot(sigma2), disp=False)
     if not np.isfinite(covmean).all():
         msg = ('fid calculation produces singular product; '
@@ -203,8 +188,8 @@ def fid_distance_from_activations(acts1, acts2):
             + np.trace(sigma2) - 2 * tr_covmean)
 
 
-def interpolate_im(im_tensor):
-    return F.interpolate(im_tensor, scale_factor=2, mode='bilinear', align_corners=False)
+def upscale_twice_tensor(im_tensor):
+    return F.interpolate(im_tensor, scale_factor=2, mode='bilinear', align_corners=True)
 
 
 @torch.no_grad()
@@ -220,11 +205,83 @@ def validate(model_inc, model_gan, val_loader):
         label = label_transformer.get_one_hot(label).type(torch.float32)
         fake = model_gan.generate(image, label)
 
-        _acts_real = model_inc(interpolate_im(image)).detach().cpu().numpy()
-        _acts_fake = model_inc(interpolate_im(fake)).detach().cpu().numpy()
+        _acts_real = model_inc(upscale_twice_tensor(image)).detach().cpu().numpy()
+        _acts_fake = model_inc(upscale_twice_tensor(fake)).detach().cpu().numpy()
 
         acts_real[idx * val_loader.batch_size: idx * val_loader.batch_size + image.size(0)] = _acts_real
         acts_fake[idx * val_loader.batch_size: idx * val_loader.batch_size + image.size(0)] = _acts_fake
 
     return fid_distance_from_activations(acts_real, acts_fake)
 
+
+def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
+
+    # build_model
+    if checkpoint is not None:
+        model = StarGAN.from_checkpoint(checkpoint)
+
+        optimizer_d = 0
+        optimizer_g = 0
+
+        scheduler_d = 0
+        scheduler_g = 0
+
+        start_epoch = checkpoint['epoch']
+
+    else:
+        # model = StarGAN(
+        #     lbl_features=conf
+        # )
+        optimizer_d = torch.optim.Adam(model.D.parameters(), lr=config['lr_d'], betas=config['betas_d'])
+        optimizer_g = torch.optim.Adam(model.G.parameters(), lr=config['lr_g'], betas=config['betas_g'])
+
+        # optimizer_d.load_state_dict(ckpt['optimizer_d_state_dict'])
+        # optimizer_g.load_state_dict(ckpt['optimizer_g_state_dict'])
+
+        optimizers = {
+            'D': optimizer_d,
+            'G': optimizer_g
+        }
+
+        start_epoch = 0
+
+        k = config['lr_d'] / (config['epochs'] - 10)
+        print(f"k = {k}")
+        lambda_lr = lambda epoch: config['lr_d'] - k * (epoch - 10) if epoch > 9 else config['lr_d']
+
+
+    # TODO: automatic loader builder
+    # train_loader = build_loader()
+
+    ckpt_save_path = '/Users/macder/lalala/'
+    best_fid_value = 1e6
+
+    # train_loop
+    for epoch_num in range(start_epoch, config['epochs']):
+        for model_T in optimizers:
+            for g in optimizers[model_T].param_groups:
+                g['lr'] = lambda_lr(epoch_num)
+
+        losses = train_epoch(celeba_dataloader, model, optimizers, epoch_num + 1, config, log=True)
+
+        save_checkpoint(model, optimizers, epoch_num, "spectral_norm.pth")
+        fid = validate(inception_model, model, celeba_val_dataloader)
+
+        checkpoint = {
+            'model_state_dict': model.state_dict(),
+            'optimizer_d': optimizers['D'].state_dict(),
+            'optimizer_g': optimizers['G'].state_dict(),
+            'epoch': epoch_num + 1,
+            'fid_value': fid
+        }
+
+        save_checkpoint(ckpt_save_path / 'best.pth', checkpoint)
+
+        if best_fid_value > fid:
+            best_fid_value = fid
+            save_checkpoint(ckpt_save_path / 'best.pth', checkpoint)
+
+        wandb.log({"FID metric:": fid})
+        wandb.log({'learning_rate': optimizer_d.param_groups[0]['lr']})
+
+        print(f"Epoch: {epoch_num + 1}, FID value: {fid}")
