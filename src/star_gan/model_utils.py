@@ -316,7 +316,7 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
         test_im, test_labels = next(iter(val_loader))
 
         generated_val = generate_batch_wandb(test_im,
-                                             label_transformer.get_one_hot(test_labels),
+                                             label_transformer.get_one_hot(test_labels).type(torch.float32),
                                              model.G,
                                              target_attributes)
 
