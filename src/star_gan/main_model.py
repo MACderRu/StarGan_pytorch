@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 
-from .common_modules import (BaseResidualBlock,
+from .common_modules import (BaseConvBlock,
+                             BaseResidualBlock,
                              DownsampleBlock,
                              UpsampleBlock)
 
@@ -12,7 +13,7 @@ class Generator(nn.Module):
         super().__init__()
         self.image_size = image_size
         self.down_sample = nn.Sequential(
-            DownsampleBlock(3 + label_size, 64, kernel_size=7, norm=True, act=nn.ReLU),
+            BaseConvBlock(3 + label_size, 64, kernel_size=7, stride=1, norm=True, act=nn.ReLU),
             DownsampleBlock(64, 128, kernel_size=4, norm=True, act=nn.ReLU),
             DownsampleBlock(128, 256, kernel_size=4, norm=True, act=nn.ReLU),
         )
