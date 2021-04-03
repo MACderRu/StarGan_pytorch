@@ -336,7 +336,7 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
                              train_params,
                              label_transformer,
                              log_step=config.wandb.log_step)
-        fid = validate(fid_calc_model, model, val_loader)
+        fid = validate(fid_calc_model, model, val_loader, label_transformer)
 
         checkpoint = {
             'model_state_dict': model.state_dict(),
