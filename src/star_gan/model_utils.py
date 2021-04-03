@@ -276,7 +276,6 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
     ckpt_save_path = Path(config.checkpoints.save_path) / f"run{last_run_num + 1}"
     os.mkdir(ckpt_save_path)
 
-
     # build_model
     model = StarGAN(
         lbl_features=label_transformer.label_dim,
