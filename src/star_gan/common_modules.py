@@ -82,7 +82,7 @@ class DownsampleBlock(nn.Module):
         self.conv = nn.Conv2d(input_features,
                               output_features,
                               kernel_size=kernel_size,
-                              padding=kernel_size // 2,
+                              padding=(kernel_size - 1) // 2,
                               stride=2)
 
         if spectral_normalize:
