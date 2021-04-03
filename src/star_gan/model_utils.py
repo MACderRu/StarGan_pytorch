@@ -313,6 +313,7 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
 
     best_fid_value = 1e6
     fid_calc_model = models.resnext50_32x4d(pretrained=True)
+    fid_calc_model.to(config.device)
 
     # train_loop
     for epoch_num in range(start_epoch, train_params['epochs_num']):
