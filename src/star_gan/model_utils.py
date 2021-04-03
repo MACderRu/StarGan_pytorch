@@ -47,8 +47,8 @@ def compute_gradient_penalty(discriminator, real_samples, fake_samples):
     return ((norm - 1) ** 2).mean()
 
 
-def get_description(desc, epoch, d_cls, d_adv, d_gp, g_cls, g_adv, g_rec):
-    return desc.format(epoch, g_cls, g_adv, g_rec, d_cls, d_adv, d_gp)
+def get_description(desc, epoch, d_cls, d_adv, g_cls, g_adv, g_rec, g_rec_fake):
+    return desc.format(epoch, g_cls, g_adv, g_rec, g_rec_fake, d_cls, d_adv)
 
 
 def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transformer, log_step=None):
@@ -73,14 +73,15 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
         }
     }
 
-    description = "Epoch: {}: Loss G: cls {:.4f}, adv {:.4f}, rec {:.4f}; \
-                    Loss D: cls {:.4f}, adv {:.4f}, gp {:.4f}"
+    description = "Epoch: {}: Loss G: cls {:.4f}, adv {:.4f}, rec_real {:.4f}, rec_real {:.4f}; \
+        Loss D: cls {:.4f}, adv {:.4f}"
 
     pbar = tqdm(train_loader, leave=False, desc=description.format(epoch_num, 0, 0, 0, 0, 0, 0))
 
-    g_adv_loss = torch.tensor([1000])
-    g_cls_loss = torch.tensor([1000])
-    g_rec_loss = torch.tensor([1000])
+    g_adv_loss = torch.tensor([0])
+    g_cls_loss = torch.tensor([0])
+    g_loss_rec_orig = torch.tensor([0])
+    g_loss_rec_fake = torch.tensor([0])
 
     gp_loss = torch.tensor([0])
 
@@ -114,38 +115,44 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
                                              epoch_num,
                                              d_loss_cls.item(),
                                              d_loss_adv.item(),
-                                             gp_loss.item(),
                                              g_cls_loss.item(),
                                              g_adv_loss.item(),
-                                             g_rec_loss.item()))
+                                             g_loss_rec_orig.item(),
+                                             g_loss_rec_fake.item()))
 
         if iter_idx % config['n_critic'] == 0:
             image_fake = model.forward_g(image, fake_labels)
+
+            g_loss_rec_fake = torch.mean((image_fake - image) ** 2)
+
             image_reconstructed = model.forward_g(image_fake, true_labels)
 
-            g_rec_loss = torch.mean(torch.abs(image - image_reconstructed))
+            g_loss_rec_orig = torch.mean(torch.abs(image - image_reconstructed))
             fake_patch_out, cls_fake = model.forward_d(image_fake)
 
             g_cls_loss = F.binary_cross_entropy_with_logits(cls_fake, fake_labels.clone())
             g_adv_loss = -fake_patch_out.mean()
 
             optimizer_g.zero_grad()
-            loss = g_adv_loss + config['lambda_cls'] * g_cls_loss + config['lambda_rec_original'] * g_rec_loss
+            loss = (g_adv_loss + config['lambda_cls'] * g_cls_loss
+                    + config['lambda_rec_original'] * g_loss_rec_orig
+                    + config['lambda_rec_fake'] * g_loss_rec_fake)
             loss.backward()
             optimizer_g.step()
 
             losses['G']['adversarial'].append(g_adv_loss.item())
-            losses['G']['reconstruction'].append(g_rec_loss.item())
+            losses['G']['rec_fake'].append(g_loss_rec_fake.item())
+            losses['G']['rec_real'].append(g_loss_rec_orig.item())
             losses['G']['classification'].append(g_cls_loss.item())
 
             pbar.set_description(get_description(description,
                                                  epoch_num,
                                                  d_loss_cls.item(),
                                                  d_loss_adv.item(),
-                                                 gp_loss.item(),
                                                  g_cls_loss.item(),
                                                  g_adv_loss.item(),
-                                                 g_rec_loss.item()))
+                                                 g_loss_rec_orig.item(),
+                                                 g_loss_rec_fake.item()))
 
         if log_step and iter_idx % log_step == 0:
             for type_m in losses:

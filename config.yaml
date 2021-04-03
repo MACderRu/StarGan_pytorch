@@ -11,10 +11,10 @@ data:
       - Gray_Hair
       - Brown_Hair
 training:
-  lambda_gp: 10
-  lambda_cls: 1
-  lambda_rec_original: 10
-  lambda_rec_fake: 1
+  lambda_gp: 1
+  lambda_cls: 5
+  lambda_rec_original: 30
+  lambda_rec_fake: 10
   learning_rate_discriminator: 0.0001
   learning_rate_generator: 0.0001
   adam_betas: [0.5, 0.999]
