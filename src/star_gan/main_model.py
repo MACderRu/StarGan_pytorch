@@ -2,17 +2,20 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 
-from .common_modules import BaseConvBlock, BaseResidualBlock
+from .common_modules import (BaseConvBlock,
+                             BaseResidualBlock,
+                             DownsampleBlock,
+                             UpsampleBlock)
 
 
 class Generator(nn.Module):
-    def __init__(self, input_features, output_features, residual_num, image_size):
+    def __init__(self, output_features, residual_num, image_size):
         super().__init__()
         self.image_size = image_size
         self.down_sample = nn.Sequential(
-            BaseConvBlock(input_features, 64, 7, 1, padding=3),
-            BaseConvBlock(64, 128, 4, 2),
-            BaseConvBlock(128, 256, 4, 2)
+            DownsampleBlock(3, 64, kernel_size=7, norm=True, act=nn.ReLU),
+            DownsampleBlock(64, 128, kernel_size=4, norm=True, act=nn.ReLU),
+            DownsampleBlock(128, 256, kernel_size=4, norm=True, act=nn.ReLU),
         )
 
         self.residual = nn.Sequential(
@@ -22,11 +25,9 @@ class Generator(nn.Module):
         )
 
         self.up_sample = nn.Sequential(
-            BaseConvBlock(256, 128, kernel_size=3, stride=1, padding=1, upsample=True),
-            BaseConvBlock(128, 64, kernel_size=3, stride=1, padding=1, upsample=True),
-            BaseConvBlock(64, output_features,
-                          kernel_size=7, stride=1, padding=3,
-                          norm=False, upsample=False, act='nn.Tanh')
+            UpsampleBlock(256, 128, kernel_size=3),
+            UpsampleBlock(128, 64, kernel_size=3),
+            UpsampleBlock(64, output_features, kernel_size=7, act=nn.Tanh),
         )
 
     def forward(self, x, labels):
@@ -42,16 +43,16 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_features, label_features, image_size):
+    def __init__(self, label_features, image_size):
         super().__init__()
 
         self.model = nn.Sequential(
-            BaseConvBlock(input_features, 64, 4, 2, 1, norm=False, act='nn.LeakyReLU', spectral_normalize=True),
-            BaseConvBlock(64, 128, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
-            BaseConvBlock(128, 256, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
-            BaseConvBlock(256, 512, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
-            BaseConvBlock(512, 1024, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
-            BaseConvBlock(1024, 2048, 4, 2, 1, act='nn.LeakyReLU', norm=False, spectral_normalize=True),
+            DownsampleBlock(3, 64, 4, act=nn.LeakyReLU, spectral_normalize=True),
+            DownsampleBlock(64, 128, 4, act=nn.LeakyReLU, spectral_normalize=True),
+            DownsampleBlock(128, 256, 4, act=nn.LeakyReLU, spectral_normalize=True),
+            DownsampleBlock(256, 512, 4, act=nn.LeakyReLU, spectral_normalize=True),
+            DownsampleBlock(512, 1024, 4, act=nn.LeakyReLU, spectral_normalize=True),
+            DownsampleBlock(1024, 2048, 4, act=nn.LeakyReLU, spectral_normalize=True),
         )
 
         self.patch_discriminator_conv = spectral_norm(nn.Conv2d(2048, 1, kernel_size=3, padding=1))
@@ -76,14 +77,12 @@ class StarGAN(nn.Module):
         super().__init__()
 
         self.G = Generator(
-            input_features=3 + lbl_features,
             output_features=3,
             residual_num=residual_block_number,
             image_size=image_size
         )
 
         self.D = Discriminator(
-            input_features=3,
             label_features=lbl_features,
             image_size=image_size
         )
@@ -95,5 +94,5 @@ class StarGAN(nn.Module):
         return self.D(image)
 
     def generate(self, image, label):
-        return self.G(image, label)
+        return self.G(image, label).detach()
 

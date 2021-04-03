@@ -5,37 +5,102 @@ from torch.nn.utils import spectral_norm
 
 
 class BaseConvBlock(nn.Module):
-    def __init__(self, in_features, out_features,
-                 kernel_size, stride, padding=1,
-                 norm=True, upsample=False, act='nn.ReLU', spectral_normalize=False):
+    def __init__(self,
+                 input_features,
+                 output_features,
+                 kernel_size,
+                 stride,
+                 padding=None,
+                 norm=False,
+                 act=None):
         super().__init__()
 
-        self.conv = nn.Conv2d(in_features,
-                              out_features,
+        if padding is None:
+            padding = (kernel_size - 1) // 2
+
+        self.conv = nn.Conv2d(input_features,
+                              output_features,
                               kernel_size=kernel_size,
                               stride=stride,
                               padding=padding)
 
+        self.norm = nn.InstanceNorm2d(output_features, affine=True, track_running_stats=True) if norm else nn.Identity()
+
+        if act:
+            self.act = act()
+        else:
+            self.act = nn.Identity()
+
+    def forward(self, x):
+        return self.act(self.norm(self.conv(x)))
+
+
+class UpsampleBlock(nn.Module):
+    def __init__(self,
+                 input_features,
+                 output_features,
+                 kernel_size,
+                 padding=None,
+                 norm=None,
+                 act=None,
+                 spectral_normalize=False):
+        super().__init__()
+
+        if padding is None:
+            padding = (kernel_size - 1) // 2
+
+        self.conv = nn.Conv2d(input_features,
+                              output_features,
+                              kernel_size=kernel_size,
+                              padding=padding,
+                              stride=1)
         if spectral_normalize:
             self.conv = spectral_norm(self.conv)
 
-        self.norm = nn.InstanceNorm2d(out_features, affine=True, track_running_stats=True) if norm else nn.Identity()
-        try:
-            self.act = eval(act)()
-        except Exception:
-            self.act = nn.Identity()
+        self.norm = nn.InstanceNorm2d(output_features, affine=True, track_running_stats=True) if norm else nn.Identity()
 
-        self.upsample = upsample
+        if act is None:
+            self.act = nn.Identity()
+        else:
+            self.act = act()
 
     def forward(self, x):
-        if self.upsample:
-            x = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=False)
+        x = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=True)
+        return self.act(self.norm(self.conv(x)))
 
+
+class DownsampleBlock(nn.Module):
+    def __init__(self,
+                 input_features,
+                 output_features,
+                 kernel_size,
+                 norm=False,
+                 act=None,
+                 spectral_normalize=False):
+        super().__init__()
+
+        self.conv = nn.Conv2d(input_features,
+                              output_features,
+                              kernel_size=kernel_size,
+                              padding=kernel_size // 2,
+                              stride=2)
+
+        if spectral_normalize:
+            self.conv = spectral_norm(self.conv)
+
+        self.norm = nn.InstanceNorm2d(output_features, affine=True, track_running_stats=True) if norm else nn.Identity()
+
+        if act is None:
+            self.act = nn.Identity()
+        else:
+            self.act = act()
+
+    def forward(self, x):
         return self.act(self.norm(self.conv(x)))
 
 
 class BaseResidualBlock(nn.Module):
-    def __init__(self, features, kernel_size, stride, padding=1, spectral_=False):
+    def __init__(self, features, kernel_size, stride):
         super().__init__()
 
         self.block1 = BaseConvBlock(
@@ -43,8 +108,7 @@ class BaseResidualBlock(nn.Module):
             features,
             kernel_size=kernel_size,
             stride=stride,
-            padding=padding,
-            spectral_normalize=spectral_
+            norm=True,
         )
 
         self.block2 = BaseConvBlock(
@@ -52,12 +116,9 @@ class BaseResidualBlock(nn.Module):
             features,
             kernel_size=kernel_size,
             stride=stride,
-            padding=padding,
-            act="ne nado",
-            spectral_normalize=spectral_
         )
 
-        self.act = nn.LeakyReLU(0.01)
+        self.act = nn.ReLU()
 
     def forward(self, x):
         z = self.block1(x)

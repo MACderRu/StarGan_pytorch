@@ -1,3 +1,4 @@
+import os
 import wandb
 import typing as tp
 import numpy as np
@@ -273,6 +274,7 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
 
     last_run_num = find_last_run(config.checkpoints.save_path)
     ckpt_save_path = Path(config.checkpoints.save_path) / f"run{last_run_num + 1}"
+    os.mkdir(ckpt_save_path)
 
 
     # build_model
@@ -315,16 +317,17 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
     fid_calc_model = models.resnext50_32x4d(pretrained=True)
     fid_calc_model.to(config.device)
 
+    test_im, test_labels = next(iter(val_loader))
+    test_labels = label_transformer.get_one_hot(test_labels).type(torch.float32)
+
     # train_loop
     for epoch_num in range(start_epoch, train_params['epochs_num']):
         for model_T in optimizers:
             for g in optimizers[model_T].param_groups:
                 g['lr'] = lambda_lr(epoch_num)
 
-        test_im, test_labels = next(iter(val_loader))
-
         generated_val = generate_batch_wandb(test_im,
-                                             label_transformer.get_one_hot(test_labels).type(torch.float32),
+                                             test_labels,
                                              model.G,
                                              target_attributes)
 
