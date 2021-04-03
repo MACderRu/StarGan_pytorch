@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torchvision.models as models
+import torchvision
 from torchvision import transforms
 from pathlib import Path
 from torch.utils.data import DataLoader, random_split
@@ -223,6 +224,21 @@ def validate(model_inc, model_gan, val_loader, label_transformer):
     return fid_distance_from_activations(acts_real, acts_fake)
 
 
+def generate_batch_wandb(image, label, generator, target_attributes):
+    generated_batches = [(image + 1) / 2]
+
+    device = next(generator.parameters()).device
+    for trg_idx, trg_attr in enumerate(target_attributes):
+        old_column = label[:, trg_idx].clone()
+        label[:, trg_idx] = 1.
+        generated = (generator(image.to(device), label.to(device)).detach().cpu() + 1) / 2
+        generated_batches.append(generated)
+        label[:, trg_idx] = old_column
+
+    grid_img = torchvision.utils.make_grid(torch.cat(generated_batches, dim=0), nrow=image.size(0))
+    return grid_img.permute(1, 2, 0).numpy()
+
+
 def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
     train_params = config.training
 
@@ -296,6 +312,15 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
         for model_T in optimizers:
             for g in optimizers[model_T].param_groups:
                 g['lr'] = lambda_lr(epoch_num)
+
+        test_im, test_labels = next(iter(val_loader))
+
+        generated_val = generate_batch_wandb(test_im,
+                                             label_transformer.get_one_hot(test_labels),
+                                             model.G,
+                                             target_attributes)
+
+        wandb.log({"Images/test_permutations": wandb.Image(generated_val)})
 
         losses = train_epoch(train_loader,
                              model,
