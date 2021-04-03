@@ -9,7 +9,7 @@ from pathlib import Path
 from torch.utils.data import DataLoader, random_split
 from torch.autograd import grad
 from scipy import linalg
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from ..common_utils.utils import (permute_labels,
                                   save_checkpoint,
