@@ -109,7 +109,7 @@ class BaseResidualBlock(nn.Module):
             kernel_size=kernel_size,
             stride=stride,
             norm=True,
-            act=nn.ReLU()
+            act=nn.ReLU
         )
 
         self.block2 = BaseConvBlock(
