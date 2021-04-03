@@ -217,7 +217,8 @@ def validate(model_inc, model_gan, val_loader, label_transformer):
     acts_real = np.zeros((len(val_loader.dataset), 1000))
     acts_fake = np.zeros((len(val_loader.dataset), 1000))
 
-    for idx, (image, label) in tqdm(enumerate(val_loader), desc='Running evaluation...', leave=False):
+    pbar = tqdm(val_loader, desc='Running evaluation...', leave=False)
+    for idx, (image, label) in enumerate(pbar):
         image = image.to(device)
         label = label.to(device)
         label = label_transformer.get_one_hot(label).type(torch.float32)
