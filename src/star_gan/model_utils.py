@@ -64,16 +64,16 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
         "D": {
             'adversarial': [],
             'classification': [],
-            'gp_loss': []
         },
         "G": {
             'adversarial': [],
-            'reconstruction': [],
+            'rec_fake': [],
+            'rec_real': [],
             'classification': []
         }
     }
 
-    description = "Epoch: {}: Loss G: cls {:.4f}, adv {:.4f}, rec_real {:.4f}, rec_real {:.4f}; \
+    description = "Epoch: {}: Loss G: cls {:.4f}, adv {:.4f}, rec_real {:.4f}, rec_fake {:.4f}; \
         Loss D: cls {:.4f}, adv {:.4f}"
 
     pbar = tqdm(train_loader, leave=False, desc=description.format(epoch_num, 0, 0, 0, 0, 0, 0))
@@ -108,7 +108,7 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
         optimizer_d.step()
 
         losses['D']['adversarial'].append(d_loss_adv.item())
-        losses['D']['gp_loss'].append(gp_loss.item())
+        # losses['D']['gp_loss'].append(gp_loss.item())
         losses['D']['classification'].append(d_loss_cls.item())
 
         pbar.set_description(get_description(description,
