@@ -25,8 +25,8 @@ class Generator(nn.Module):
         )
 
         self.up_sample = nn.Sequential(
-            UpsampleBlock(256, 128, kernel_size=4, norm=True, act=nn.ReLU),
-            UpsampleBlock(128, 64, kernel_size=4, norm=True, act=nn.ReLU),
+            UpsampleBlock(256, 128, kernel_size=5, norm=True, act=nn.ReLU),
+            UpsampleBlock(128, 64, kernel_size=5, norm=True, act=nn.ReLU),
         )
 
         self.out_block = nn.Sequential(
