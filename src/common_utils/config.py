@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import yaml
 import typing as tp
 
@@ -36,7 +34,7 @@ class Config(DotDict):
     DotDict child dedicated to be used to store MarioNet config contents
     """
     @classmethod
-    def from_file(cls, filepath: str = "config.yaml") -> Config:
+    def from_file(cls, filepath: str = "config.yaml"):
         """
         Reads yaml file and populates self with its contents
         :param str filepath: path to config file
