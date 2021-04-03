@@ -2,14 +2,13 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 
-from .common_modules import (BaseConvBlock,
-                             BaseResidualBlock,
+from .common_modules import (BaseResidualBlock,
                              DownsampleBlock,
                              UpsampleBlock)
 
 
 class Generator(nn.Module):
-    def __init__(self, output_features, residual_num, image_size):
+    def __init__(self, residual_num, image_size):
         super().__init__()
         self.image_size = image_size
         self.down_sample = nn.Sequential(
@@ -27,7 +26,7 @@ class Generator(nn.Module):
         self.up_sample = nn.Sequential(
             UpsampleBlock(256, 128, kernel_size=3),
             UpsampleBlock(128, 64, kernel_size=3),
-            UpsampleBlock(64, output_features, kernel_size=7, act=nn.Tanh),
+            UpsampleBlock(64, 3, kernel_size=7, act=nn.Tanh),
         )
 
     def forward(self, x, labels):
@@ -77,7 +76,6 @@ class StarGAN(nn.Module):
         super().__init__()
 
         self.G = Generator(
-            output_features=3,
             residual_num=residual_block_number,
             image_size=image_size
         )
