@@ -8,11 +8,11 @@ from .common_modules import (BaseResidualBlock,
 
 
 class Generator(nn.Module):
-    def __init__(self, residual_num, image_size):
+    def __init__(self, label_size, residual_num, image_size):
         super().__init__()
         self.image_size = image_size
         self.down_sample = nn.Sequential(
-            DownsampleBlock(3, 64, kernel_size=7, norm=True, act=nn.ReLU),
+            DownsampleBlock(3 + label_size, 64, kernel_size=7, norm=True, act=nn.ReLU),
             DownsampleBlock(64, 128, kernel_size=4, norm=True, act=nn.ReLU),
             DownsampleBlock(128, 256, kernel_size=4, norm=True, act=nn.ReLU),
         )
@@ -76,6 +76,7 @@ class StarGAN(nn.Module):
         super().__init__()
 
         self.G = Generator(
+            label_size=lbl_features,
             residual_num=residual_block_number,
             image_size=image_size
         )
