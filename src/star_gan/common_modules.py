@@ -41,7 +41,7 @@ class UpsampleBlock(nn.Module):
                  output_features,
                  kernel_size,
                  padding=None,
-                 norm=None,
+                 norm=False,
                  act=None,
                  spectral_normalize=False):
         super().__init__()
@@ -74,15 +74,19 @@ class DownsampleBlock(nn.Module):
                  input_features,
                  output_features,
                  kernel_size,
+                 padding=None,
                  norm=False,
                  act=None,
                  spectral_normalize=False):
         super().__init__()
 
+        if padding is None:
+            padding = (kernel_size - 1) // 2
+
         self.conv = nn.Conv2d(input_features,
                               output_features,
                               kernel_size=kernel_size,
-                              padding=(kernel_size - 1) // 2,
+                              padding=padding,
                               stride=2)
 
         if spectral_normalize:
