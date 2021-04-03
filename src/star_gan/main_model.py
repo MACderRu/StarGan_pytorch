@@ -96,3 +96,4 @@ class StarGAN(nn.Module):
 
     def generate(self, image, label):
         return self.G(image, label)
+

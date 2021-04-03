@@ -3,11 +3,21 @@ import typing as tp
 import numpy as np
 import torch
 import torch.nn.functional as F
+import torchvision.models as models
+from torchvision import transforms
+from pathlib import Path
+from torch.utils.data import DataLoader, random_split
 from torch.autograd import grad
 from scipy import linalg
 from tqdm.auto import tqdm
 
-from ..common_utils.utils import permute_labels, save_checkpoint, load_checkpoint
+from ..common_utils.utils import (permute_labels,
+                                  save_checkpoint,
+                                  load_checkpoint,
+                                  load_celeba,
+                                  find_last_run,
+                                  LabelTransformer)
+
 from ..common_utils.config import Config
 from ..star_gan.main_model import StarGAN
 
@@ -44,7 +54,6 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
     model.train()
     iter_idx = 0
 
-
     optimizer_d = optimizers['D']
     optimizer_g = optimizers['G']
 
@@ -63,10 +72,10 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
         }
     }
 
-    description = "Epoch: {}: Loss G: cls {:.4f}, adv {:.4f}, rec {:.4f};\n \
+    description = "Epoch: {}: Loss G: cls {:.4f}, adv {:.4f}, rec {:.4f}; \
                     Loss D: cls {:.4f}, adv {:.4f}, gp {:.4f}"
 
-    pbar = tqdm(train_loader, leave=False, desc=description.format(epoch_num, 0, 0, 0, 0, 0, 0), ncols=850)
+    pbar = tqdm(train_loader, leave=False, desc=description.format(epoch_num, 0, 0, 0, 0, 0, 0))
 
     g_adv_loss = torch.tensor([1000])
     g_cls_loss = torch.tensor([1000])
@@ -109,7 +118,7 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
                                              g_adv_loss.item(),
                                              g_rec_loss.item()))
 
-        if iter_idx % config['generator_step'] == 0:
+        if iter_idx % config['n_critic'] == 0:
             image_fake = model.forward_g(image, fake_labels)
             image_reconstructed = model.forward_g(image_fake, true_labels)
 
@@ -120,7 +129,7 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
             g_adv_loss = -fake_patch_out.mean()
 
             optimizer_g.zero_grad()
-            loss = g_adv_loss + config['lambda_cls'] * g_cls_loss + config['lambda_rec'] * g_rec_loss
+            loss = g_adv_loss + config['lambda_cls'] * g_cls_loss + config['lambda_rec_original'] * g_rec_loss
             loss.backward()
             optimizer_g.step()
 
@@ -137,7 +146,7 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
                                                  g_adv_loss.item(),
                                                  g_rec_loss.item()))
 
-        if iter_idx % 100 == 0 and log:
+        if log_step and iter_idx % log_step == 0:
             for type_m in losses:
                 for loss_type in losses[type_m]:
                     wandb.log({
@@ -193,7 +202,7 @@ def upscale_twice_tensor(im_tensor):
 
 
 @torch.no_grad()
-def validate(model_inc, model_gan, val_loader):
+def validate(model_inc, model_gan, val_loader, label_transformer):
     device = next(model_inc.parameters()).device
 
     acts_real = np.zeros((len(val_loader.dataset), 1000))
@@ -215,57 +224,87 @@ def validate(model_inc, model_gan, val_loader):
 
 
 def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
+    train_params = config.training
+
+    data_transforms = transforms.Compose([
+        transforms.Resize(64),
+        transforms.CenterCrop(64),
+        transforms.ToTensor(),
+        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    ])
+
+    dataset = load_celeba(config.data.celeba.path, transforms=data_transforms)
+    target_attributes = config.data.celeba.AttributeList
+    attrs = dataset.attr_names
+    idx2attr_orig = {idx: attr for idx, attr in enumerate(attrs)}
+    # print(idx2attr_orig)
+    # print(target_attributes)
+    label_transformer = LabelTransformer(target_attributes, idx2attr_orig)
+
+    val_size = len(dataset) // 10
+    train_size = len(dataset) - val_size
+
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    train_loader = DataLoader(train_dataset, batch_size=train_params['batch_size'], shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=train_params['batch_size'], shuffle=True)
+
+    last_run_num = find_last_run(config.checkpoints.save_path)
+    ckpt_save_path = Path(config.checkpoints.save_path) / f"run{last_run_num + 1}"
+
 
     # build_model
+    model = StarGAN(
+        lbl_features=label_transformer.label_dim,
+        image_size=64,
+        residual_block_number=6
+    )
+
+    optimizer_d = torch.optim.Adam(model.D.parameters(),
+                                   lr=train_params['learning_rate_discriminator'],
+                                   betas=train_params['adam_betas'])
+
+    optimizer_g = torch.optim.Adam(model.G.parameters(),
+                                   lr=train_params['learning_rate_generator'],
+                                   betas=train_params['adam_betas'])
+
+    optimizers = {
+        'D': optimizer_d,
+        'G': optimizer_g
+    }
+
+    start_epoch = 0
+
     if checkpoint is not None:
-        model = StarGAN.from_checkpoint(checkpoint)
+        model = model.load_state_dict(checkpoint['model_state_dict'])
 
-        optimizer_d = 0
-        optimizer_g = 0
-
-        scheduler_d = 0
-        scheduler_g = 0
+        optimizer_d.load_state_dict(checkpoint['optimizer_d_state_dict'])
+        optimizer_g.load_state_dict(checkpoint['optimizer_g_state_dict'])
 
         start_epoch = checkpoint['epoch']
 
-    else:
-        # model = StarGAN(
-        #     lbl_features=conf
-        # )
-        optimizer_d = torch.optim.Adam(model.D.parameters(), lr=config['lr_d'], betas=config['betas_d'])
-        optimizer_g = torch.optim.Adam(model.G.parameters(), lr=config['lr_g'], betas=config['betas_g'])
+    model.to(config.device)
 
-        # optimizer_d.load_state_dict(ckpt['optimizer_d_state_dict'])
-        # optimizer_g.load_state_dict(ckpt['optimizer_g_state_dict'])
+    k = float(train_params['learning_rate_generator']) / (train_params['epochs_num'] - 10)
+    lambda_lr = (lambda epoch: float(train_params['learning_rate_generator']) - k * (epoch - 10)
+                 if epoch > 9 else float(train_params['learning_rate_generator']))
 
-        optimizers = {
-            'D': optimizer_d,
-            'G': optimizer_g
-        }
-
-        start_epoch = 0
-
-        k = config['lr_d'] / (config['epochs'] - 10)
-        print(f"k = {k}")
-        lambda_lr = lambda epoch: config['lr_d'] - k * (epoch - 10) if epoch > 9 else config['lr_d']
-
-
-    # TODO: automatic loader builder
-    # train_loader = build_loader()
-
-    ckpt_save_path = '/Users/macder/lalala/'
     best_fid_value = 1e6
+    fid_calc_model = models.resnext50_32x4d(pretrained=True)
 
     # train_loop
-    for epoch_num in range(start_epoch, config['epochs']):
+    for epoch_num in range(start_epoch, train_params['epochs_num']):
         for model_T in optimizers:
             for g in optimizers[model_T].param_groups:
                 g['lr'] = lambda_lr(epoch_num)
 
-        losses = train_epoch(celeba_dataloader, model, optimizers, epoch_num + 1, config, log=True)
-
-        save_checkpoint(model, optimizers, epoch_num, "spectral_norm.pth")
-        fid = validate(inception_model, model, celeba_val_dataloader)
+        losses = train_epoch(train_loader,
+                             model,
+                             optimizers,
+                             epoch_num + 1,
+                             train_params,
+                             label_transformer,
+                             log_step=config.wandb.log_step)
+        fid = validate(fid_calc_model, model, val_loader)
 
         checkpoint = {
             'model_state_dict': model.state_dict(),
@@ -275,13 +314,11 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
             'fid_value': fid
         }
 
-        save_checkpoint(ckpt_save_path / 'best.pth', checkpoint)
+        save_checkpoint(Path(ckpt_save_path) / 'last.pth', checkpoint)
 
         if best_fid_value > fid:
             best_fid_value = fid
-            save_checkpoint(ckpt_save_path / 'best.pth', checkpoint)
+            save_checkpoint(Path(ckpt_save_path) / 'best.pth', checkpoint)
 
-        wandb.log({"FID metric:": fid})
-        wandb.log({'learning_rate': optimizer_d.param_groups[0]['lr']})
-
-        print(f"Epoch: {epoch_num + 1}, FID value: {fid}")
+        wandb.log({"Validation/fid:": fid})
+        wandb.log({"Model/lr": optimizer_d.param_groups[0]['lr']})

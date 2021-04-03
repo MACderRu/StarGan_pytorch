@@ -1,12 +1,13 @@
+import os
 import sys
 import wandb
 import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 from torchvision.datasets import CelebA
+from glob import glob
 
 from .config import Config
 
@@ -41,13 +42,7 @@ class LabelTransformer:
         return mask
 
 
-def load_celeba(path):
-    transforms = torchvision.transforms.Compose([
-        torchvision.transforms.Resize((128, 128)),
-        torchvision.transforms.ToTensor(),
-        torchvision.transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-    ])
-
+def load_celeba(path, transforms=None):
     try:
         data = CelebA(path, transform=transforms, target_type='attr', download=False)
     except Exception as e:
@@ -77,5 +72,11 @@ def terminate_launch(message, logging_state):
     sys.exit(0)
 
 
-def get_latest_run(checkpoints_path_dir):
-    pass
+def find_last_run(ckpt_dir_path: str) -> int:
+    if not os.listdir(ckpt_dir_path):
+        return 0
+
+    runs_list = glob(ckpt_dir_path + '/*')
+    last_run_path = sorted(runs_list, key=lambda name: int(name.split('/')[-1][3:]))[-1]
+
+    return int(last_run_path.split('/')[-1][3:])

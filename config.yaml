@@ -1,5 +1,7 @@
 data:
   celeba:
+    path: ./celeba/
+    image_size: 64
     AttributeList:
       - Young
       - Male
@@ -13,8 +15,8 @@ training:
   lambda_cls: 1
   lambda_rec_original: 10
   lambda_rec_fake: 1
-  learning_rate_discriminator: 1e-4
-  learning_rate_generator: 1e-4
+  learning_rate_discriminator: 0.0001
+  learning_rate_generator: 0.0001
   adam_betas: [0.5, 0.999]
   n_critic: 5
   epochs_num: 20
