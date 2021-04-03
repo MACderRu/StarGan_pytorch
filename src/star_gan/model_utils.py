@@ -159,7 +159,7 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
             for type_m in losses:
                 for loss_type in losses[type_m]:
                     wandb.log({
-                        type_m + '/' + loss_type: np.mean(losses[type_m][loss_type][-100:])
+                        type_m + '/' + loss_type: np.mean(losses[type_m][loss_type][-log_step:])
                     })
 
     return losses

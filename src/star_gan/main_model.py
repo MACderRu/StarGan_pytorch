@@ -24,9 +24,13 @@ class Generator(nn.Module):
         )
 
         self.up_sample = nn.Sequential(
-            UpsampleBlock(256, 128, kernel_size=3),
-            UpsampleBlock(128, 64, kernel_size=3),
-            UpsampleBlock(64, 3, kernel_size=7, act=nn.Tanh),
+            UpsampleBlock(256, 128, kernel_size=4, norm=True, act=nn.ReLU),
+            UpsampleBlock(128, 64, kernel_size=4, norm=True, act=nn.ReLU),
+        )
+
+        self.out_block = nn.Sequential(
+            nn.Conv2d(64, 3, kernel_size=7, stride=1, padding=3),
+            nn.Tanh()
         )
 
     def forward(self, x, labels):
@@ -38,6 +42,7 @@ class Generator(nn.Module):
         x = self.down_sample(x)
         x = self.residual(x)
         x = self.up_sample(x)
+        x = self.out_block(x)
         return x
 
 
