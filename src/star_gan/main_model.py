@@ -20,7 +20,7 @@ class Generator(nn.Module):
 
         self.residual = nn.Sequential(
             *[
-                BaseResidualBlock(256, kernel_size=3, stride=1) for _ in range(residual_num)
+                BaseResidualBlock(256, kernel_size=3) for _ in range(residual_num)
             ]
         )
 
@@ -100,4 +100,3 @@ class StarGAN(nn.Module):
 
     def generate(self, image, label):
         return self.G(image, label).detach()
-
