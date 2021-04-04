@@ -4,6 +4,15 @@ import torch.nn.functional as F
 from torch.nn.utils import spectral_norm
 
 
+class InstNorm2d(nn.Module):
+    def __init__(self, features):
+        super().__init__()
+        self.norm = nn.InstanceNorm2d(features, affine=True, track_running_stats=True)
+
+    def forward(self, x):
+        return self.norm(x)
+
+
 class BaseConvBlock(nn.Module):
     def __init__(self,
                  input_features,
@@ -12,7 +21,8 @@ class BaseConvBlock(nn.Module):
                  stride,
                  padding=None,
                  norm=False,
-                 act=None):
+                 act=None,
+                 bias=False):
         super().__init__()
 
         if padding is None:
@@ -22,9 +32,10 @@ class BaseConvBlock(nn.Module):
                               output_features,
                               kernel_size=kernel_size,
                               stride=stride,
-                              padding=padding)
+                              padding=padding,
+                              bias=bias)
 
-        self.norm = nn.InstanceNorm2d(output_features, affine=True, track_running_stats=True) if norm else nn.Identity()
+        self.norm = InstNorm2d(output_features) if norm else nn.Identity()
 
         if act:
             self.act = act()
@@ -57,7 +68,7 @@ class UpsampleBlock(nn.Module):
         if spectral_normalize:
             self.conv = spectral_norm(self.conv)
 
-        self.norm = nn.InstanceNorm2d(output_features, affine=True, track_running_stats=True) if norm else nn.Identity()
+        self.norm = InstNorm2d(output_features) if norm else nn.Identity()
 
         if act is None:
             self.act = nn.Identity()
@@ -92,7 +103,7 @@ class DownsampleBlock(nn.Module):
         if spectral_normalize:
             self.conv = spectral_norm(self.conv)
 
-        self.norm = nn.InstanceNorm2d(output_features, affine=True, track_running_stats=True) if norm else nn.Identity()
+        self.norm = InstNorm2d(output_features) if norm else nn.Identity()
 
         if act is None:
             self.act = nn.Identity()
@@ -104,28 +115,23 @@ class DownsampleBlock(nn.Module):
 
 
 class BaseResidualBlock(nn.Module):
-    def __init__(self, features, kernel_size, stride):
+    def __init__(self, features, kernel_size):
         super().__init__()
 
-        self.block1 = BaseConvBlock(
-            features,
-            features,
-            kernel_size=kernel_size,
-            stride=stride,
-            norm=True,
-            act=nn.ReLU
-        )
+        padding = kernel_size // 2
 
-        self.block2 = BaseConvBlock(
-            features,
-            features,
-            kernel_size=kernel_size,
-            stride=stride,
+        self.blocks = nn.Sequential(
+            nn.Conv2d(features, features // 2, kernel_size=1, stride=1),
+            InstNorm2d(features // 2),
+            nn.ReLU(),
+            nn.Conv2d(features // 2, features // 2, kernel_size=kernel_size, stride=1, padding=padding),
+            InstNorm2d(features // 2),
+            nn.ReLU(),
+            nn.Conv2d(features // 2, features, kernel_size=1, stride=1)
         )
 
         self.act = nn.ReLU()
 
     def forward(self, x):
-        z = self.block1(x)
-        z = self.block2(z)
+        z = self.blocks(x)
         return self.act(z + x)
