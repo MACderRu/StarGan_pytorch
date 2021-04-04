@@ -127,7 +127,8 @@ class BaseResidualBlock(nn.Module):
             nn.Conv2d(features // 2, features // 2, kernel_size=kernel_size, stride=1, padding=padding),
             InstNorm2d(features // 2),
             nn.ReLU(),
-            nn.Conv2d(features // 2, features, kernel_size=1, stride=1)
+            nn.Conv2d(features // 2, features, kernel_size=1, stride=1),
+            InstNorm2d(features)
         )
 
         self.act = nn.ReLU()
