@@ -252,8 +252,8 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
     train_params = config.training
 
     data_transforms = transforms.Compose([
-        transforms.Resize(128),
-        transforms.CenterCrop(128),
+        transforms.Resize(config.data.celeba.image_size),
+        transforms.CenterCrop(config.data.celeba.image_size),
         transforms.ToTensor(),
         transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
@@ -277,7 +277,7 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
     # build_model
     model = StarGAN(
         lbl_features=label_transformer.label_dim,
-        image_size=64,
+        image_size=config.data.celeba.image_size,
         residual_block_number=6
     )
 
