@@ -1,6 +1,8 @@
 # StarGan_pytorch
 My implementation of StarGan paper <https://arxiv.org/pdf/1711.09020.pdf>
+
 torch version: 1.8
+
 python >= 3.8
 
 Some addition features:
