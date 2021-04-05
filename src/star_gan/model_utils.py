@@ -300,7 +300,7 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
     start_epoch = 0
 
     if checkpoint is not None:
-        model = model.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint['model_state_dict'])
 
         optimizer_d.load_state_dict(checkpoint['optimizer_d'])
         optimizer_g.load_state_dict(checkpoint['optimizer_g'])
