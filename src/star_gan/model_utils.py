@@ -99,7 +99,7 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
         real_patch_out, real_cls_out = model.forward_d(image)
 
         d_loss_adv = - real_patch_out.mean() + fake_patch_out.mean()
-        d_loss_cls = F.binary_cross_entropy_with_logits(real_cls_out, true_labels.clone())
+        d_loss_cls = F.binary_cross_entropy_with_logits(real_cls_out, true_labels, size_average=False) / real_cls_out.size(0)
 
         # gp_loss = compute_gradient_penalty(model.D, image, image_fake)
 
@@ -131,7 +131,7 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
             g_loss_rec_orig = torch.mean(torch.abs(image - image_reconstructed))
             fake_patch_out, cls_fake = model.forward_d(image_fake)
 
-            g_cls_loss = F.binary_cross_entropy_with_logits(cls_fake, fake_labels.clone())
+            g_cls_loss = F.binary_cross_entropy_with_logits(cls_fake, fake_labels, size_average=False) / cls_fake.size(0)
             g_adv_loss = -fake_patch_out.mean()
 
             optimizer_g.zero_grad()
