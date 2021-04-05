@@ -13,9 +13,7 @@ from torch.autograd import grad
 from scipy import linalg
 from tqdm import tqdm
 
-from ..common_utils.utils import (permute_labels,
-                                  save_checkpoint,
-                                  load_checkpoint,
+from ..common_utils.utils import (save_checkpoint,
                                   load_celeba,
                                   find_last_run,
                                   LabelTransformer,
@@ -86,7 +84,7 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
     g_loss_rec_orig = torch.tensor([0])
     g_loss_rec_fake = torch.tensor([0])
 
-    gp_loss = torch.tensor([0])
+    # gp_loss = torch.tensor([0])
 
     for image, label in pbar:
         image = image.to(device)
@@ -223,7 +221,7 @@ def validate(model_inc, model_gan, val_loader, label_transformer):
     for idx, (image, label) in enumerate(pbar):
         image = image.to(device)
         label = label.to(device)
-        label = label_transformer.get_one_hot(label).type(torch.float32)
+        label = label_transformer.get_target(label).type(torch.float32)
         fake = model_gan.generate(image, label)
 
         _acts_real = model_inc(upscale_twice_tensor(image)).detach().cpu().numpy()
@@ -254,8 +252,8 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
     train_params = config.training
 
     data_transforms = transforms.Compose([
-        transforms.Resize(64),
-        transforms.CenterCrop(64),
+        transforms.Resize(128),
+        transforms.CenterCrop(128),
         transforms.ToTensor(),
         transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
@@ -332,6 +330,9 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
                                              target_attributes)
 
         wandb.log({"Images/test_permutations": wandb.Image(generated_val)})
+
+        if epoch_num > 10:
+            train_params.lambda_rec_fake = 0.
 
         losses = train_epoch(train_loader,
                              model,
