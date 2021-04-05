@@ -61,10 +61,8 @@ class Discriminator(nn.Module):
         )
 
         self.patch_discriminator_conv = spectral_norm(nn.Conv2d(2048, 1, kernel_size=3, padding=1))
-
         cls_size = image_size // 64
-        self.classification_conv = spectral_norm(nn.Conv2d(2048, label_features, kernel_size=cls_size))
-        self.global_pooling = nn.AvgPool2d(cls_size)
+        self.classification_conv = nn.Conv2d(2048, label_features, kernel_size=cls_size)
 
     def forward(self, x):
         x = self.model(x)

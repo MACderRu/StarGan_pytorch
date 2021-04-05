@@ -64,7 +64,8 @@ class UpsampleBlock(nn.Module):
                               output_features,
                               kernel_size=kernel_size,
                               padding=padding,
-                              stride=1)
+                              stride=1,
+                              bias=False)
         if spectral_normalize:
             self.conv = spectral_norm(self.conv)
 
@@ -98,7 +99,8 @@ class DownsampleBlock(nn.Module):
                               output_features,
                               kernel_size=kernel_size,
                               padding=padding,
-                              stride=2)
+                              stride=2,
+                              bias=False)
 
         if spectral_normalize:
             self.conv = spectral_norm(self.conv)
@@ -121,13 +123,13 @@ class BaseResidualBlock(nn.Module):
         padding = kernel_size // 2
 
         self.blocks = nn.Sequential(
-            nn.Conv2d(features, features // 2, kernel_size=1, stride=1),
+            nn.Conv2d(features, features // 2, kernel_size=1, stride=1, bias=False),
             InstNorm2d(features // 2),
             nn.ReLU(),
-            nn.Conv2d(features // 2, features // 2, kernel_size=kernel_size, stride=1, padding=padding),
+            nn.Conv2d(features // 2, features // 2, kernel_size=kernel_size, stride=1, padding=padding, bias=False),
             InstNorm2d(features // 2),
             nn.ReLU(),
-            nn.Conv2d(features // 2, features, kernel_size=1, stride=1),
+            nn.Conv2d(features // 2, features, kernel_size=1, stride=1, bias=False),
             InstNorm2d(features)
         )
 
