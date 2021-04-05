@@ -18,7 +18,8 @@ from ..common_utils.utils import (permute_labels,
                                   load_checkpoint,
                                   load_celeba,
                                   find_last_run,
-                                  LabelTransformer)
+                                  LabelTransformer,
+                                  optimizer_to)
 
 from ..common_utils.config import Config
 from ..star_gan.main_model import StarGAN
@@ -304,11 +305,12 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
 
         optimizer_d.load_state_dict(checkpoint['optimizer_d'])
         optimizer_g.load_state_dict(checkpoint['optimizer_g'])
+        optimizer_to(optimizer_g, config.device)
+        optimizer_to(optimizer_d, config.device)
 
         start_epoch = checkpoint['epoch']
 
     model.to(config.device)
-
     k = float(train_params['learning_rate_generator']) / (train_params['epochs_num'] - 10)
     lambda_lr = (lambda epoch: float(train_params['learning_rate_generator']) - k * (epoch - 10)
                  if epoch > 9 else float(train_params['learning_rate_generator']))

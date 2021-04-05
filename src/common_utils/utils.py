@@ -80,3 +80,17 @@ def find_last_run(ckpt_dir_path: str) -> int:
     last_run_path = sorted(runs_list, key=lambda name: int(name.split('/')[-1][3:]))[-1]
 
     return int(last_run_path.split('/')[-1][3:])
+
+
+def optimizer_to(optim, device):
+    for param in optim.state.values():
+        if isinstance(param, torch.Tensor):
+            param.data = param.data.to(device)
+            if param._grad is not None:
+                param._grad.data = param._grad.data.to(device)
+        elif isinstance(param, dict):
+            for subparam in param.values():
+                if isinstance(subparam, torch.Tensor):
+                    subparam.data = subparam.data.to(device)
+                    if subparam._grad is not None:
+                        subparam._grad.data = subparam._grad.data.to(device)
