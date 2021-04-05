@@ -19,6 +19,7 @@ from ..common_utils.utils import (permute_labels,
                                   load_celeba,
                                   find_last_run,
                                   LabelTransformer,
+                                  LabelTransformerUpdated,
                                   optimizer_to)
 
 from ..common_utils.config import Config
@@ -92,8 +93,8 @@ def train_epoch(train_loader, model, optimizers, epoch_num, config, label_transf
         label = label.to(device)
 
         iter_idx += 1
-        true_labels = label_transformer.get_one_hot(label).type(torch.float32)
-        fake_labels = permute_labels(true_labels)
+        true_labels = label_transformer.get_target(label).type(torch.float32)
+        fake_labels = label_transformer.revert_one_label(true_labels)
 
         image_fake = model.forward_g(image, fake_labels).detach()
         fake_patch_out, fake_cls_out = model.forward_d(image_fake)
@@ -261,11 +262,8 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
 
     dataset = load_celeba(config.data.celeba.path, transforms=data_transforms)
     target_attributes = config.data.celeba.AttributeList
-    attrs = dataset.attr_names
-    idx2attr_orig = {idx: attr for idx, attr in enumerate(attrs)}
-    # print(idx2attr_orig)
-    # print(target_attributes)
-    label_transformer = LabelTransformer(target_attributes, idx2attr_orig)
+    original_attributes = dataset.attr_names
+    label_transformer = LabelTransformerUpdated(original_attributes, target_attributes)
 
     val_size = len(dataset) // 10
     train_size = len(dataset) - val_size
@@ -320,7 +318,7 @@ def train_model(config: Config, checkpoint: tp.Optional[dict] = None) -> None:
     fid_calc_model.to(config.device)
 
     test_im, test_labels = next(iter(val_loader))
-    test_labels = label_transformer.get_one_hot(test_labels).type(torch.float32)
+    test_labels = label_transformer.get_target(test_labels).type(torch.float32)
 
     # train_loop
     for epoch_num in range(start_epoch, train_params['epochs_num']):

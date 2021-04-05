@@ -42,6 +42,42 @@ class LabelTransformer:
         return mask
 
 
+class LabelTransformerUpdated:
+    def __init__(self, original_attrs, target_attrs):
+        self.orig_attrs = original_attrs
+        self.target_attrs = target_attrs
+
+        self.trg_attr2idx = {attr: idx for idx, attr in enumerate(target_attrs)}
+        self.orig_attr2idx = {attr: idx for idx, attr in enumerate(original_attrs)}
+
+        self.hair_labels = [idx for idx, attr in enumerate(target_attrs) if '_Hair' in attr]
+        self.other_labels = [idx for idx, attr in enumerate(target_attrs) if '_Hair' not in attr]
+
+        self.label_dim = len(target_attrs)
+
+        self.mask = self._get_mask()
+
+    def get_target(self, orig_labels):
+        if orig_labels.ndim == 1:
+            return orig_labels[self.mask]
+
+        return orig_labels[:, self.mask]
+
+    def revert_one_label(self, labels):
+        fake = labels.clone()
+        if 0.5 < np.random.rand():
+            #  permute hair
+            fake[:, self.hair_labels] = permute_labels(fake[:, self.hair_labels])
+        else:
+            # change one other attribute
+            trg_idx = np.random.choice(self.other_labels)
+            fake[:, trg_idx] = torch.abs(fake[:, trg_idx] - 1)
+        return fake
+
+    def _get_mask(self):
+        return np.array([self.orig_attr2idx[attr] for attr in self.target_attrs])
+
+
 def load_celeba(path, transforms=None):
     try:
         data = CelebA(path, transform=transforms, target_type='attr', download=False)
